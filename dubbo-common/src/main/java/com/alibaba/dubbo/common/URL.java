@@ -67,11 +67,14 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * @see java.net.URL
  * @see java.net.URI
+ *
+ * URL统一模型，是作为Dubbo的配置总线，传递上下文信息。相当于一个Map，但作为URL契约形成规范，使代码统一且易读
  */
 public final class URL implements Serializable {
 
     private static final long serialVersionUID = -1985165475234910535L;
 
+    // 协议
     private final String protocol;
 
     private final String username;

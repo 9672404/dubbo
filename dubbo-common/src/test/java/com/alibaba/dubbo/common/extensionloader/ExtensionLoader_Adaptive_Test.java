@@ -19,6 +19,7 @@ package com.alibaba.dubbo.common.extensionloader;
 import com.alibaba.dubbo.common.URL;
 import com.alibaba.dubbo.common.extension.ExtensionLoader;
 import com.alibaba.dubbo.common.extensionloader.adaptive.HasAdaptiveExt;
+import com.alibaba.dubbo.common.extensionloader.adaptive.impl.HasAdaptiveExtImpl1;
 import com.alibaba.dubbo.common.extensionloader.adaptive.impl.HasAdaptiveExt_ManualAdaptive;
 import com.alibaba.dubbo.common.extensionloader.ext1.SimpleExt;
 import com.alibaba.dubbo.common.extensionloader.ext2.Ext2;
@@ -29,7 +30,6 @@ import com.alibaba.dubbo.common.extensionloader.ext5.NoAdaptiveMethodExt;
 import com.alibaba.dubbo.common.extensionloader.ext6_inject.Ext6;
 import com.alibaba.dubbo.common.extensionloader.ext6_inject.impl.Ext6Impl2;
 import com.alibaba.dubbo.common.utils.LogUtil;
-
 import junit.framework.Assert;
 import org.junit.Test;
 
@@ -37,11 +37,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import static org.hamcrest.CoreMatchers.allOf;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertThat;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import static org.junit.Assert.*;
 import static org.junit.matchers.JUnitMatchers.containsString;
 
 public class ExtensionLoader_Adaptive_Test {
@@ -51,6 +47,8 @@ public class ExtensionLoader_Adaptive_Test {
         ExtensionLoader<HasAdaptiveExt> loader = ExtensionLoader.getExtensionLoader(HasAdaptiveExt.class);
         HasAdaptiveExt ext = loader.getAdaptiveExtension();
         assertTrue(ext instanceof HasAdaptiveExt_ManualAdaptive);
+        URL url = new URL("p1", "1.2.2.2", 33).addParameter("key", "impl1");
+        assertEquals(HasAdaptiveExtImpl1.class.getSimpleName(), ext.echo(url, ""));
     }
 
     @Test
