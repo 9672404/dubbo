@@ -43,8 +43,10 @@ public class ProtocolFilterWrapper implements Protocol {
         this.protocol = protocol;
     }
 
+    // filter包装为invoker，实现链式调用
     private static <T> Invoker<T> buildInvokerChain(final Invoker<T> invoker, String key, String group) {
         Invoker<T> last = invoker;
+        // 此处使用了@Activate注解自动激活指定group的扩展类
         List<Filter> filters = ExtensionLoader.getExtensionLoader(Filter.class).getActivateExtension(invoker.getUrl(), key, group);
         if (!filters.isEmpty()) {
             for (int i = filters.size() - 1; i >= 0; i--) {

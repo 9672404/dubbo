@@ -30,6 +30,7 @@ public class SpiExtensionFactory implements ExtensionFactory {
         if (type.isInterface() && type.isAnnotationPresent(SPI.class)) {
             ExtensionLoader<T> loader = ExtensionLoader.getExtensionLoader(type);
             if (!loader.getSupportedExtensions().isEmpty()) {
+                // 默认返回自适应类，如果SPI接口没有自适应方法，直接抛异常
                 return loader.getAdaptiveExtension();
             }
         }

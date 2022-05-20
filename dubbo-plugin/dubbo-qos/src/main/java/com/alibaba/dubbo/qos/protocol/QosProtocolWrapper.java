@@ -65,6 +65,7 @@ public class QosProtocolWrapper implements Protocol {
     @Override
     public <T> Invoker<T> refer(Class<T> type, URL url) throws RpcException {
         if (Constants.REGISTRY_PROTOCOL.equals(url.getProtocol())) {
+            // Qos依赖于netty实现，用于动态的对服务进行查询和控制。例如对获取当前提供和消费的所有服务，以及对服务进行动态的上下线，即从注册中心上进行注册和反注册操作
             startQosServer(url);
             return protocol.refer(type, url);
         }

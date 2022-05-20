@@ -68,6 +68,7 @@ public class RegistryProtocol implements Protocol {
     //providerurl <--> exporter
     private final Map<String, ExporterChangeableWrapper<?>> bounds = new ConcurrentHashMap<String, ExporterChangeableWrapper<?>>();
     private Cluster cluster;
+    // Dubbo IOC注入自适应类
     private Protocol protocol;
     private RegistryFactory registryFactory;
     private ProxyFactory proxyFactory;
@@ -134,29 +135,41 @@ public class RegistryProtocol implements Protocol {
         //export invoker
         final ExporterChangeableWrapper<T> exporter = doLocalExport(originInvoker);
 
+        // 获取注册中心 URL，以 zookeeper 注册中心为例，得到的示例 URL 如下：
+        // zookeeper://127.0.0.1:2181/com.alibaba.dubbo.registry.RegistryService?application=demo-provider&dubbo=2.0.2&export=dubbo%3A%2F%2F172.17.48.52%3A20880%2Fcom.alibaba.dubbo.demo.DemoService%3Fanyhost%3Dtrue%26application%3Ddemo-provider
         URL registryUrl = getRegistryUrl(originInvoker);
 
-        //registry provider
+        // 根据 URL 加载 Registry 实现类，比如 ZookeeperRegistry
         final Registry registry = getRegistry(originInvoker);
+        // 获取已经注册的服务提供者URL
+        // dubbo://172.17.48.52:20880/com.alibaba.dubbo.demo.DemoService?anyhost=true&application=demo-provider&dubbo=2.0.2&generic=false&interface=com.alibaba.dubbo.demo.DemoService&methods=sayHello
         final URL registeredProviderUrl = getRegisteredProviderUrl(originInvoker);
 
         //to judge to delay publish whether or not
         boolean register = registeredProviderUrl.getParameter("register", true);
 
+        // 向服务提供者与消费者注册表中注册服务提供者
         ProviderConsumerRegTable.registerProvider(originInvoker, registryUrl, registeredProviderUrl);
 
+        // 根据 register 的值决定是否注册服务
         if (register) {
+            // 向注册中心注册服务
             register(registryUrl, registeredProviderUrl);
             ProviderConsumerRegTable.getProviderWrapper(originInvoker).setReg(true);
         }
 
         // Subscribe the override data
         // FIXME When the provider subscribes, it will affect the scene : a certain JVM exposes the service and call the same service. Because the subscribed is cached key with the name of the service, it causes the subscription information to cover.
+        // 获取订阅 URL，比如：
+        // provider://172.17.48.52:20880/com.alibaba.dubbo.demo.DemoService?category=configurators&check=false&anyhost=true&application=demo-provider&dubbo=2.0.2&generic=false&interface=com.alibaba.dubbo.demo.DemoService&methods=sayHello
         final URL overrideSubscribeUrl = getSubscribedOverrideUrl(registeredProviderUrl);
+        // 创建监听器
         final OverrideListener overrideSubscribeListener = new OverrideListener(overrideSubscribeUrl, originInvoker);
         overrideListeners.put(overrideSubscribeUrl, overrideSubscribeListener);
+        // 向注册中心进行订阅 override 数据
         registry.subscribe(overrideSubscribeUrl, overrideSubscribeListener);
         //Ensure that a new exporter instance is returned every time export
+        // 创建并返回 DestroyableExporter
         return new DestroyableExporter<T>(exporter, originInvoker, overrideSubscribeUrl, registeredProviderUrl);
     }
 
@@ -168,7 +181,10 @@ public class RegistryProtocol implements Protocol {
             synchronized (bounds) {
                 exporter = (ExporterChangeableWrapper<T>) bounds.get(key);
                 if (exporter == null) {
+                    // 创建 Invoker 为委托类对象，此时invoker的URL变为了ProviderUrl
+                    // TODO 委托类的思想
                     final Invoker<?> invokerDelegete = new InvokerDelegete<T>(originInvoker, getProviderUrl(originInvoker));
+                    // 此时是根据provider配置查找protocol导出，如dubboProtocol
                     exporter = new ExporterChangeableWrapper<T>((Exporter<T>) protocol.export(invokerDelegete), originInvoker);
                     bounds.put(key, exporter);
                 }
@@ -184,7 +200,7 @@ public class RegistryProtocol implements Protocol {
      * @param newInvokerUrl
      */
     @SuppressWarnings("unchecked")
-    private <T> void doChangeLocalExport(final Invoker<T> originInvoker, URL newInvokerUrl) {
+    private <T> void  doChangeLocalExport(final Invoker<T> originInvoker, URL newInvokerUrl) {
         String key = getCacheKey(originInvoker);
         final ExporterChangeableWrapper<T> exporter = (ExporterChangeableWrapper<T>) bounds.get(key);
         if (exporter == null) {
@@ -248,6 +264,7 @@ public class RegistryProtocol implements Protocol {
      * @return
      */
     private URL getProviderUrl(final Invoker<?> origininvoker) {
+        // 导出服务的url, dubbo://172.17.48.52:20880/com.alibaba.dubbo.demo.DemoService?anyhost=true&application=demo-provider&dubbo=2.0.2&generic=false&interface=com.alibaba.dubbo.demo.DemoService&methods=sayHello
         String export = origininvoker.getUrl().getParameterAndDecoded(Constants.EXPORT_KEY);
         if (export == null || export.length() == 0) {
             throw new IllegalArgumentException("The registry export url is null! registry: " + origininvoker.getUrl());

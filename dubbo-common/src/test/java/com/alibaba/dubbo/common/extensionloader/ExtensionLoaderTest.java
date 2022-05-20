@@ -370,7 +370,7 @@ public class ExtensionLoaderTest {
         // test default
         URL url = URL.valueOf("test://localhost/test");
         List<ActivateExt1> list = ExtensionLoader.getExtensionLoader(ActivateExt1.class)
-                .getActivateExtension(url, new String[]{}, "default_group");
+                .getActivateExtension(url, new String[]{"value"}, "default_group");
         Assert.assertEquals(1, list.size());
         Assert.assertTrue(list.get(0).getClass() == ActivateExt1Impl1.class);
 

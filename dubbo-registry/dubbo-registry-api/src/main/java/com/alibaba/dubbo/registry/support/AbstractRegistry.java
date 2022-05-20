@@ -70,6 +70,8 @@ public abstract class AbstractRegistry implements Registry {
     private final AtomicLong lastCacheChanged = new AtomicLong();
     private final Set<URL> registered = new ConcurrentHashSet<URL>();
     private final ConcurrentMap<URL, Set<NotifyListener>> subscribed = new ConcurrentHashMap<URL, Set<NotifyListener>>();
+    /*内存中的服务缓存对象，URL是消费者的URL，内层Map的key是分类，包括providers、consumers等
+     value则对应的服务列表，对于没有服务提供者提供服务的URL,它会以特殊的empty:// 前缀开头 */
     private final ConcurrentMap<URL, Map<String, List<URL>>> notified = new ConcurrentHashMap<URL, Map<String, List<URL>>>();
     private URL registryUrl;
     // Local disk cache file
@@ -195,6 +197,7 @@ public abstract class AbstractRegistry implements Registry {
             InputStream in = null;
             try {
                 in = new FileInputStream(file);
+                // 保存服务提供者的URL，key：URL#serviceKey()。value：提供者列表、 路由规则列表、配置规则列表等
                 properties.load(in);
                 if (logger.isInfoEnabled()) {
                     logger.info("Load registry store file " + file + ", data: " + properties);
@@ -388,6 +391,7 @@ public abstract class AbstractRegistry implements Registry {
         }
         Map<String, List<URL>> result = new HashMap<String, List<URL>>();
         for (URL u : urls) {
+            // 分类URL
             if (UrlUtils.isMatch(url, u)) {
                 String category = u.getParameter(Constants.CATEGORY_KEY, Constants.DEFAULT_CATEGORY);
                 List<URL> categoryList = result.get(category);
@@ -410,7 +414,9 @@ public abstract class AbstractRegistry implements Registry {
             String category = entry.getKey();
             List<URL> categoryList = entry.getValue();
             categoryNotified.put(category, categoryList);
+            // 将url缓存到本地磁盘文件，因为当我们的注册表由于网络抖动而出现订阅失败时，我们可以返回现有的缓存URL。
             saveProperties(url);
+            // 对于所有url进行分类的通知
             listener.notify(categoryList);
         }
     }
@@ -433,6 +439,7 @@ public abstract class AbstractRegistry implements Registry {
                     }
                 }
             }
+            // 更新最新数据到properties，properties继而转为file本地磁盘文件
             properties.setProperty(url.getServiceKey(), buf.toString());
             long version = lastCacheChanged.incrementAndGet();
             if (syncSaveFile) {

@@ -73,10 +73,12 @@ public abstract class AbstractZookeeperClient<TargetChildListener> implements Zo
                 return;
             }
         }
+        // 若存在多个/，形如dubbo/demoService/provider,除最后一个层级外，递归创建持久节点
         int i = path.lastIndexOf('/');
         if (i > 0) {
             create(path.substring(0, i), false);
         }
+        // 递归结束
         if (ephemeral) {
             createEphemeral(path);
         } else {

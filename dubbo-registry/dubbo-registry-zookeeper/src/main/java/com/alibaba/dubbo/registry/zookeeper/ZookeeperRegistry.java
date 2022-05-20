@@ -129,8 +129,10 @@ public class ZookeeperRegistry extends FailbackRegistry {
     @Override
     protected void doSubscribe(final URL url, final NotifyListener listener) {
         try {
+            // 处理所有服务的订阅，客户端第一次连接上注册中心上时，进行全量数据的拉取
             if (Constants.ANY_VALUE.equals(url.getServiceInterface())) {
                 String root = toRootPath();
+                // 监听器集合，没有则新建
                 ConcurrentMap<NotifyListener, ChildListener> listeners = zkListeners.get(url);
                 if (listeners == null) {
                     zkListeners.putIfAbsent(url, new ConcurrentHashMap<NotifyListener, ChildListener>());
@@ -138,11 +140,14 @@ public class ZookeeperRegistry extends FailbackRegistry {
                 }
                 ChildListener zkListener = listeners.get(listener);
                 if (zkListener == null) {
+                    // 获取监听器，若不存在则新建
                     listeners.putIfAbsent(listener, new ChildListener() {
                         @Override
                         public void childChanged(String parentPath, List<String> currentChilds) {
+                            // 遍历所有的子节点
                             for (String child : currentChilds) {
                                 child = URL.decode(child);
+                                // 若有新增的服务，则对这个服务发起订阅
                                 if (!anyServices.contains(child)) {
                                     anyServices.add(child);
                                     subscribe(url.setPath(child).addParameters(Constants.INTERFACE_KEY, child,
@@ -153,8 +158,10 @@ public class ZookeeperRegistry extends FailbackRegistry {
                     });
                     zkListener = listeners.get(listener);
                 }
+                // 创建持久化节点，并对持久化节点的子节点发起订阅
                 zkClient.create(root, false);
                 List<String> services = zkClient.addChildListener(root, zkListener);
+                // 获取持久化节点下的所有服务，逐个发起订阅
                 if (services != null && !services.isEmpty()) {
                     for (String service : services) {
                         service = URL.decode(service);
@@ -164,7 +171,9 @@ public class ZookeeperRegistry extends FailbackRegistry {
                     }
                 }
             } else {
+                // 针对具体服务发起订阅
                 List<URL> urls = new ArrayList<URL>();
+                // 根据URL的类别，获取一组要订阅的路径，类别：providers、routers、consumers、configurators
                 for (String path : toCategoriesPath(url)) {
                     ConcurrentMap<NotifyListener, ChildListener> listeners = zkListeners.get(url);
                     if (listeners == null) {
@@ -173,20 +182,19 @@ public class ZookeeperRegistry extends FailbackRegistry {
                     }
                     ChildListener zkListener = listeners.get(listener);
                     if (zkListener == null) {
-                        listeners.putIfAbsent(listener, new ChildListener() {
-                            @Override
-                            public void childChanged(String parentPath, List<String> currentChilds) {
-                                ZookeeperRegistry.this.notify(url, listener, toUrlsWithEmpty(url, parentPath, currentChilds));
-                            }
-                        });
+                        // 获取ChildListener，没有则创建，并且在子节点数据发生变更时则调用notify方法进行通知这个listener
+                        listeners.putIfAbsent(listener, (parentPath, currentChilds) -> ZookeeperRegistry.this.notify(url, listener, toUrlsWithEmpty(url, parentPath, currentChilds)));
                         zkListener = listeners.get(listener);
                     }
+                    // 创建type的持久化节点，且对于这个节点进行订阅
                     zkClient.create(path, false);
+                    // 订阅并返回该节点下的子路径，此处大概率是已经创建过的节点
                     List<String> children = zkClient.addChildListener(path, zkListener);
                     if (children != null) {
                         urls.addAll(toUrlsWithEmpty(url, path, children));
                     }
                 }
+                // 回调，更新本地缓存信息
                 notify(url, listener, urls);
             }
         } catch (Throwable e) {

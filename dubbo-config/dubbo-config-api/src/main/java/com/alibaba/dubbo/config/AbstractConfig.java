@@ -89,10 +89,12 @@ public abstract class AbstractConfig implements Serializable {
         return value;
     }
 
+    // 从配置文件中获取配置值，注入到对象中
     protected static void appendProperties(AbstractConfig config) {
         if (config == null) {
             return;
         }
+        // dubbo.registry.
         String prefix = "dubbo." + getTagName(config.getClass()) + ".";
         Method[] methods = config.getClass().getMethods();
         for (Method method : methods) {
@@ -103,6 +105,7 @@ public abstract class AbstractConfig implements Serializable {
                     String property = StringUtils.camelToSplitName(name.substring(3, 4).toLowerCase() + name.substring(4), ".");
 
                     String value = null;
+                    // 从系统变量中获取值
                     if (config.getId() != null && config.getId().length() > 0) {
                         String pn = prefix + config.getId() + "." + property;
                         value = System.getProperty(pn);
@@ -111,6 +114,7 @@ public abstract class AbstractConfig implements Serializable {
                         }
                     }
                     if (value == null || value.length() == 0) {
+                        //  dubbo.registry.protocol
                         String pn = prefix + property;
                         value = System.getProperty(pn);
                         if (!StringUtils.isBlank(value)) {
@@ -131,6 +135,7 @@ public abstract class AbstractConfig implements Serializable {
                         if (getter != null) {
                             if (getter.invoke(config) == null) {
                                 if (config.getId() != null && config.getId().length() > 0) {
+                                    // 从系统变量或dubbo配置文件中获取值，dubbo.properties.file
                                     value = ConfigUtils.getProperty(prefix + config.getId() + "." + property);
                                 }
                                 if (value == null || value.length() == 0) {

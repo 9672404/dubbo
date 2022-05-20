@@ -36,7 +36,8 @@ public class WrapperTest {
 
         w.setPropertyValue(obj, "name", "changed");
         assertEquals(w.getPropertyValue(obj, "name"), "changed");
-
+        w.invokeMethod(obj, "setName", new Class[]{Void.class}, new Object[]{"chen"});
+        assertEquals(w.getPropertyValue(obj, "name"), "chen");
         w.invokeMethod(obj, "hello", new Class<?>[]{String.class}, new Object[]{"qianlei"});
     }
 

@@ -50,8 +50,8 @@ public class ZookeeperRegistryTest {
 
     @Before
     public void setUp() throws Exception {
-        int zkServerPort = NetUtils.getAvailablePort();
-        this.zkServer = new TestingServer(zkServerPort, true);
+        int zkServerPort = 2181;
+//        this.zkServer = new TestingServer(zkServerPort, true);
         this.registryUrl = URL.valueOf("zookeeper://localhost:" + zkServerPort);
 
         zookeeperRegistryFactory = new ZookeeperRegistryFactory();
@@ -61,7 +61,7 @@ public class ZookeeperRegistryTest {
 
     @After
     public void tearDown() throws Exception {
-        zkServer.stop();
+//        zkServer.stop();
     }
 
     @Test

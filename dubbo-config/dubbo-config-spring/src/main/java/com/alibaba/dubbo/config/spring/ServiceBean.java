@@ -47,8 +47,7 @@ import static com.alibaba.dubbo.config.spring.util.BeanFactoryUtils.addApplicati
 
 /**
  * ServiceFactoryBean
- *
- * @export
+ * 该类是作为Dubbo和Spring关联的桥梁
  */
 public class ServiceBean<T> extends ServiceConfig<T> implements InitializingBean, DisposableBean,
         ApplicationContextAware, ApplicationListener<ContextRefreshedEvent>, BeanNameAware,
@@ -99,6 +98,7 @@ public class ServiceBean<T> extends ServiceConfig<T> implements InitializingBean
 
     @Override
     public void onApplicationEvent(ContextRefreshedEvent event) {
+        // 无需延迟&还未被暴露&支持暴露
         if (isDelay() && !isExported() && !isUnexported()) {
             if (logger.isInfoEnabled()) {
                 logger.info("The service ready on spring started. service: " + getInterface());
@@ -107,15 +107,24 @@ public class ServiceBean<T> extends ServiceConfig<T> implements InitializingBean
         }
     }
 
+    /**
+     * 该方法判断是否延迟暴露，但命名存在歧义，新版dubbo已修正
+     * @return true 无需延迟
+     */
     private boolean isDelay() {
         Integer delay = getDelay();
         ProviderConfig provider = getProvider();
         if (delay == null && provider != null) {
             delay = provider.getDelay();
         }
+        // supportedApplicationListener是Spring自己调用setApplicationContext注入时，Dubbo判断Spring版本是否支持ApplicationListener
         return supportedApplicationListener && (delay == null || delay == -1);
     }
 
+    /**
+     * Spring初始化后，注入Dubbo配置
+     * @throws Exception
+     */
     @Override
     @SuppressWarnings({"unchecked", "deprecation"})
     public void afterPropertiesSet() throws Exception {

@@ -167,7 +167,7 @@ public class ExtensionLoader<T> {
 
     /**
      * Get activate extensions.
-     *
+     * 自动激活
      * @param url    url
      * @param values extension point names
      * @param group  group
@@ -177,6 +177,7 @@ public class ExtensionLoader<T> {
     public List<T> getActivateExtension(URL url, String[] values, String group) {
         List<T> exts = new ArrayList<T>();
         List<String> names = values == null ? new ArrayList<String>(0) : Arrays.asList(values);
+        // 根据group或value匹配扩展类，此处的value是与URL中的parameters的key做比较
         if (!names.contains(Constants.REMOVE_VALUE_PREFIX + Constants.DEFAULT_KEY)) {
             getExtensionClasses();
             for (Map.Entry<String, Activate> entry : cachedActivates.entrySet()) {
@@ -193,6 +194,7 @@ public class ExtensionLoader<T> {
             }
             Collections.sort(exts, ActivateComparator.COMPARATOR);
         }
+        // 根据方法入参传入的values匹配
         List<T> usrs = new ArrayList<T>();
         for (int i = 0; i < names.size(); i++) {
             String name = names.get(i);
@@ -345,6 +347,7 @@ public class ExtensionLoader<T> {
 
     /**
      * Register new extension via API
+     * 如果配置文件中没有配置某个扩展的映射，可以主动调用该方法增加扩展
      *
      * @param name  extension name
      * @param clazz extension class
@@ -500,10 +503,11 @@ public class ExtensionLoader<T> {
             Set<Class<?>> wrapperClasses = cachedWrapperClasses;
             if (wrapperClasses != null && !wrapperClasses.isEmpty()) {
                 for (Class<?> wrapperClass : wrapperClasses) {
-                    // 向包装类中注入实例
+                    // 向包装类中注入实例，如果存在多个包装类，此处循环注入时，后续注入的其实是上个包装类的实例，最终调用时实现了包装类链式调用的效果
                     instance = injectExtension((T) wrapperClass.getConstructor(type).newInstance(instance));
                 }
             }
+            // 这里最终可能返回包装类的实例
             return instance;
         } catch (Throwable t) {
             throw new IllegalStateException("Extension instance(name: " + name + ", class: " +
@@ -706,8 +710,7 @@ public class ExtensionLoader<T> {
             }
             String[] names = NAME_SEPARATOR.split(name);
             if (names != null && names.length > 0) {
-                // 如果类上有 Activate 注解，则使用 names 数组的第一个元素作为键，存储 name 到 Activate 注解对象的映射关系
-                // 类被@Activate修饰，表示该类为自行实现的自适应扩展类，外部统一调用扩展类，扩展类内部再分发给具体实现类
+                // TODO Activate
                 Activate activate = clazz.getAnnotation(Activate.class);
                 if (activate != null) {
                     cachedActivates.put(names[0], activate);

@@ -91,7 +91,7 @@ public abstract class Wrapper {
 
     /**
      * get wrapper.
-     *
+     * 生成包装类，相当于替代了反射机制，减少了反射性能损耗，另外就是各种类统一为包装类对外暴露
      * @param c Class instance.
      * @return Wrapper instance(not null).
      */
@@ -110,7 +110,36 @@ public abstract class Wrapper {
         return ret;
     }
 
+    /*
+        构造包装类，将原本的类转化为三个方法
+        伪代码如下：
+        public void setPropertyValue(Object o, String n, Object v){
+            if ("aa" == n) {
+                o.setAa(v)
+            }
+            if ("bb" == n) {
+                o.setBb(v)
+            }
+        }
+        public Object getPropertyValue(Object o, String n){
+            if ("aa" == n) {
+               return o.getAa(v)
+            }
+            if ("bb" == n) {
+                return o.getBb(v)
+            }
+        }
+        public Object invokeMethod(Object o, String n, Class[] p, Object[] v) {
+            if ("setAa" == n) {
+                 o.setAa(v)
+            }
+            if ("getBb" == n) {
+                 return o.getBb(v)
+            }
+        }
+     */
     private static Wrapper makeWrapper(Class<?> c) {
+        // 检测 c 是否为基本类型，若是则抛出异常
         if (c.isPrimitive())
             throw new IllegalArgumentException("Can not create wrapper for primitive type: " + c);
 
@@ -127,7 +156,9 @@ public abstract class Wrapper {
 
         Map<String, Class<?>> pts = new HashMap<String, Class<?>>(); // <property name, property types>
         Map<String, Method> ms = new LinkedHashMap<String, Method>(); // <method desc, Method instance>
+        // mns 为方法名列表
         List<String> mns = new ArrayList<String>(); // method names.
+        // 用于存储“定义在当前类中的方法”的名称
         List<String> dmns = new ArrayList<String>(); // declaring method names.
 
         // get all public field.
@@ -159,40 +190,103 @@ public abstract class Wrapper {
 
             boolean override = false;
             for (Method m2 : methods) {
+                // 检测方法是否存在重载情况，条件为：方法对象不同 && 方法名相同
                 if (m != m2 && m.getName().equals(m2.getName())) {
                     override = true;
                     break;
                 }
             }
+            // 对重载方法进行处理，考虑下面的方法：
+            //    1. void sayHello(Integer, String)
+            //    2. void sayHello(Integer, Integer)
+            // 方法名相同，参数列表长度也相同，因此不能仅通过这两项判断两个方法是否相等。
+            // 需要进一步判断方法的参数类型
             if (override) {
                 if (len > 0) {
                     for (int l = 0; l < len; l++) {
+                        // 生成参数类型进行检测代码，比如：
+                        // && $3[0].getName().equals("java.lang.Integer")
+                        //    && $3[1].getName().equals("java.lang.String")
                         c3.append(" && ").append(" $3[").append(l).append("].getName().equals(\"")
                                 .append(m.getParameterTypes()[l].getName()).append("\")");
                     }
                 }
             }
 
+            // 此时生成的代码可能如下（已格式化）：
+            // if ("sayHello".equals($2)
+            //     && $3.length == 2
+            //     && $3[0].getName().equals("java.lang.Integer")
+            //     && $3[1].getName().equals("java.lang.String")) {
             c3.append(" ) { ");
 
             if (m.getReturnType() == Void.TYPE)
+                // w.sayHello((java.lang.Integer)$4[0], (java.lang.String)$4[1]); return null;
                 c3.append(" w.").append(mn).append('(').append(args(m.getParameterTypes(), "$4")).append(");").append(" return null;");
             else
+                // return w.sayHello((java.lang.Integer)$4[0], (java.lang.String)$4[1]);
                 c3.append(" return ($w)w.").append(mn).append('(').append(args(m.getParameterTypes(), "$4")).append(");");
 
+            // if ("sayHello".equals($2)
+            //     && $3.length == 2
+            //     && $3[0].getName().equals("java.lang.Integer")
+            //     && $3[1].getName().equals("java.lang.String")) {
+            //
+            //     w.sayHello((java.lang.Integer)$4[0], (java.lang.String)$4[1]);
+            //     return null;
+            // }
             c3.append(" }");
 
+            // 存入方法名列表
             mns.add(mn);
+            // 检测当前方法是否在 c 中被声明的，若是，则将当前方法名添加到 dmns 中
             if (m.getDeclaringClass() == c)
                 dmns.add(mn);
             ms.put(ReflectUtils.getDesc(m), m);
         }
+
         if (hasMethod) {
             c3.append(" } catch(Throwable e) { ");
             c3.append("     throw new java.lang.reflect.InvocationTargetException(e); ");
             c3.append(" }");
         }
 
+        /*
+          public Object invokeMethod(Object o, String n, Class[] p, Object[] v) throws java.lang.reflect.InvocationTargetException {
+            com.alibaba.dubbo.common.bytecode.WrapperTest$I1 w;
+            try {
+                w = ((com.alibaba.dubbo.common.bytecode.WrapperTest$I1) $1);
+            } catch (Throwable e) {
+                throw new IllegalArgumentException(e);
+            }
+            try {
+                if ("hello".equals($2) && $3.length == 1) {
+                    w.hello((java.lang.String) $4[0]);
+                    return null;
+                }
+                if ("showInt".equals($2) && $3.length == 1) {
+                    return ($w) w.showInt(((Number) $4[0]).intValue());
+                }
+                if ("getFloat".equals($2) && $3.length == 0) {
+                    return ($w) w.getFloat();
+                }
+                if ("setName".equals($2) && $3.length == 1) {
+                    w.setName((java.lang.String) $4[0]);
+                    return null;
+                }
+                if ("setFloat".equals($2) && $3.length == 1) {
+                    w.setFloat(((Number) $4[0]).floatValue());
+                    return null;
+                }
+                if ("getName".equals($2) && $3.length == 0) {
+                    return ($w) w.getName();
+                }
+            } catch (Throwable e) {
+                throw new java.lang.reflect.InvocationTargetException(e);
+            }
+            throw new com.alibaba.dubbo.common.bytecode.NoSuchMethodException("Not found method \"" + $2 + "\" in class com.alibaba.dubbo.common.bytecode.WrapperTest$I1.");
+        }
+         */
         c3.append(" throw new " + NoSuchMethodException.class.getName() + "(\"Not found method \\\"\"+$2+\"\\\" in class " + c.getName() + ".\"); }");
 
         // deal with get/set method.
@@ -200,30 +294,78 @@ public abstract class Wrapper {
         for (Map.Entry<String, Method> entry : ms.entrySet()) {
             String md = entry.getKey();
             Method method = (Method) entry.getValue();
+            // 匹配以 get 开头的方法
             if ((matcher = ReflectUtils.GETTER_METHOD_DESC_PATTERN.matcher(md)).matches()) {
                 String pn = propertyName(matcher.group(1));
+                // 生成属性判断以及返回语句，示例如下：
+                // if( $2.equals("name") ) { return ($w).w.getName(); }
                 c2.append(" if( $2.equals(\"").append(pn).append("\") ){ return ($w)w.").append(method.getName()).append("(); }");
                 pts.put(pn, method.getReturnType());
+                // 匹配以 is/has/can 开头的方法
             } else if ((matcher = ReflectUtils.IS_HAS_CAN_METHOD_DESC_PATTERN.matcher(md)).matches()) {
                 String pn = propertyName(matcher.group(1));
+                // 生成属性判断以及返回语句，示例如下：
+                // if( $2.equals("dream") ) { return ($w).w.hasDream(); }
                 c2.append(" if( $2.equals(\"").append(pn).append("\") ){ return ($w)w.").append(method.getName()).append("(); }");
                 pts.put(pn, method.getReturnType());
             } else if ((matcher = ReflectUtils.SETTER_METHOD_DESC_PATTERN.matcher(md)).matches()) {
                 Class<?> pt = method.getParameterTypes()[0];
                 String pn = propertyName(matcher.group(1));
+                // 生成属性判断以及 setter 调用语句，示例如下：
+                // if( $2.equals("name") ) { w.setName((java.lang.String)$3); return; }
                 c1.append(" if( $2.equals(\"").append(pn).append("\") ){ w.").append(method.getName()).append("(").append(arg(pt, "$3")).append("); return; }");
                 pts.put(pn, pt);
             }
         }
+        /*
+            c1示例
+            public void setPropertyValue(Object o, String n, Object v) {
+                com.alibaba.dubbo.common.bytecode.WrapperTest$I1 w;
+                try {
+                    w = ((com.alibaba.dubbo.common.bytecode.WrapperTest$I1) $1);
+                } catch (Throwable e) {
+                    throw new IllegalArgumentException(e);
+                }
+                if ($2.equals("name")) {
+                    w.setName((java.lang.String) $3);
+                    return;
+                }
+                if ($2.equals("float")) {
+                    w.setFloat(((Number) $3).floatValue());
+                    return;
+                }
+                throw new com.alibaba.dubbo.common.bytecode.NoSuchPropertyException("Not found property \"" + $2 + "\" filed or setter method in class com.alibaba.dubbo.common.bytecode.WrapperTest$I1.");
+            }
+         */
         c1.append(" throw new " + NoSuchPropertyException.class.getName() + "(\"Not found property \\\"\"+$2+\"\\\" filed or setter method in class " + c.getName() + ".\"); }");
+        /*
+        c2 示例
+        public Object getPropertyValue(Object o, String n) {
+            com.alibaba.dubbo.common.bytecode.WrapperTest$I1 w;
+            try {
+                w = ((com.alibaba.dubbo.common.bytecode.WrapperTest$I1) $1);
+            } catch (Throwable e) {
+                throw new IllegalArgumentException(e);
+            }
+            if ($2.equals("float")) {
+                return ($w) w.getFloat();
+            }
+            if ($2.equals("name")) {
+                return ($w) w.getName();
+            }
+            throw new com.alibaba.dubbo.common.bytecode.NoSuchPropertyException("Not found property \"" + $2 + "\" filed or setter method in class com.alibaba.dubbo.common.bytecode.WrapperTest$I1.");
+        }
+         */
         c2.append(" throw new " + NoSuchPropertyException.class.getName() + "(\"Not found property \\\"\"+$2+\"\\\" filed or setter method in class " + c.getName() + ".\"); }");
 
         // make class
         long id = WRAPPER_CLASS_COUNTER.getAndIncrement();
+        // 创建类生成器
         ClassGenerator cc = ClassGenerator.newInstance(cl);
         cc.setClassName((Modifier.isPublic(c.getModifiers()) ? Wrapper.class.getName() : c.getName() + "$sw") + id);
         cc.setSuperClass(Wrapper.class);
 
+        // 添加字段
         cc.addDefaultConstructor();
         cc.addField("public static String[] pns;"); // property name array.
         cc.addField("public static " + Map.class.getName() + " pts;"); // property type map.
@@ -232,6 +374,7 @@ public abstract class Wrapper {
         for (int i = 0, len = ms.size(); i < len; i++)
             cc.addField("public static Class[] mts" + i + ";");
 
+        // 添加方法
         cc.addMethod("public String[] getPropertyNames(){ return pns; }");
         cc.addMethod("public boolean hasProperty(String n){ return pts.containsKey($1); }");
         cc.addMethod("public Class getPropertyType(String n){ return (Class)pts.get($1); }");
@@ -242,6 +385,7 @@ public abstract class Wrapper {
         cc.addMethod(c3.toString());
 
         try {
+            // 生成类
             Class<?> wc = cc.toClass();
             // setup static field.
             wc.getField("pts").set(null, pts);
@@ -251,6 +395,7 @@ public abstract class Wrapper {
             int ix = 0;
             for (Method m : ms.values())
                 wc.getField("mts" + ix++).set(null, m.getParameterTypes());
+            // 创建 Wrapper 实例
             return (Wrapper) wc.newInstance();
         } catch (RuntimeException e) {
             throw e;
