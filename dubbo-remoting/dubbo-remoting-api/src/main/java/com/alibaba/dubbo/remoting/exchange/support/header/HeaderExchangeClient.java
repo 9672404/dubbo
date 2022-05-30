@@ -184,12 +184,7 @@ public class HeaderExchangeClient implements ExchangeClient {
         stopHeartbeatTimer();
         if (heartbeat > 0) {
             heartbeatTimer = scheduled.scheduleWithFixedDelay(
-                    new HeartBeatTask(new HeartBeatTask.ChannelProvider() {
-                        @Override
-                        public Collection<Channel> getChannels() {
-                            return Collections.<Channel>singletonList(HeaderExchangeClient.this);
-                        }
-                    }, heartbeat, heartbeatTimeout),
+                    new HeartBeatTask(() -> Collections.singletonList(HeaderExchangeClient.this), heartbeat, heartbeatTimeout),
                     heartbeat, heartbeat, TimeUnit.MILLISECONDS);
         }
     }

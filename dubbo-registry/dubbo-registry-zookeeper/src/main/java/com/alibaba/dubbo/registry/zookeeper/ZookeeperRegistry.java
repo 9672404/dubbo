@@ -135,24 +135,21 @@ public class ZookeeperRegistry extends FailbackRegistry {
                 // 监听器集合，没有则新建
                 ConcurrentMap<NotifyListener, ChildListener> listeners = zkListeners.get(url);
                 if (listeners == null) {
-                    zkListeners.putIfAbsent(url, new ConcurrentHashMap<NotifyListener, ChildListener>());
+                    zkListeners.putIfAbsent(url, new ConcurrentHashMap<>());
                     listeners = zkListeners.get(url);
                 }
                 ChildListener zkListener = listeners.get(listener);
                 if (zkListener == null) {
                     // 获取监听器，若不存在则新建
-                    listeners.putIfAbsent(listener, new ChildListener() {
-                        @Override
-                        public void childChanged(String parentPath, List<String> currentChilds) {
-                            // 遍历所有的子节点
-                            for (String child : currentChilds) {
-                                child = URL.decode(child);
-                                // 若有新增的服务，则对这个服务发起订阅
-                                if (!anyServices.contains(child)) {
-                                    anyServices.add(child);
-                                    subscribe(url.setPath(child).addParameters(Constants.INTERFACE_KEY, child,
-                                            Constants.CHECK_KEY, String.valueOf(false)), listener);
-                                }
+                    listeners.putIfAbsent(listener, (parentPath, currentChilds) -> {
+                        // 遍历所有的子节点
+                        for (String child : currentChilds) {
+                            child = URL.decode(child);
+                            // 若有新增的服务，则对这个服务发起订阅
+                            if (!anyServices.contains(child)) {
+                                anyServices.add(child);
+                                subscribe(url.setPath(child).addParameters(Constants.INTERFACE_KEY, child,
+                                        Constants.CHECK_KEY, String.valueOf(false)), listener);
                             }
                         }
                     });
@@ -278,6 +275,7 @@ public class ZookeeperRegistry extends FailbackRegistry {
     }
 
     private String toUrlPath(URL url) {
+        // 叶子节点存的是URL全路径
         return toCategoryPath(url) + Constants.PATH_SEPARATOR + URL.encode(url.toFullString());
     }
 

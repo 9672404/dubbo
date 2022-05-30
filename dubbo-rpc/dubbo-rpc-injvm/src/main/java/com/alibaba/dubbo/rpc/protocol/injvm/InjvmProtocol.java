@@ -95,6 +95,7 @@ public class InjvmProtocol extends AbstractProtocol implements Protocol {
         final boolean isJvmRefer;
         String scope = url.getParameter(Constants.SCOPE_KEY);
         // Since injvm protocol is configured explicitly, we don't need to set any extra flag, use normal refer process.
+        // 本身已经是jvm协议了，走正常流程就是了
         if (Constants.LOCAL_PROTOCOL.toString().equals(url.getProtocol())) {
             isJvmRefer = false;
         } else if (Constants.SCOPE_LOCAL.equals(scope) || (url.getParameter("injvm", false))) {
@@ -109,6 +110,7 @@ public class InjvmProtocol extends AbstractProtocol implements Protocol {
             isJvmRefer = false;
         } else if (getExporter(exporterMap, url) != null) {
             // by default, go through local reference if there's the service exposed locally
+            // 如果有本地暴露的服务，则默认使用本地引用
             isJvmRefer = true;
         } else {
             isJvmRefer = false;

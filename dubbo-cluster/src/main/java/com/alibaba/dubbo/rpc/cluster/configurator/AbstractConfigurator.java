@@ -51,8 +51,7 @@ public abstract class AbstractConfigurator implements Configurator {
 
     @Override
     public URL configure(URL url) {
-        if (configuratorUrl == null || configuratorUrl.getHost() == null
-                || url == null || url.getHost() == null) {
+        if (configuratorUrl.getHost() == null || url == null || url.getHost() == null) {
             return url;
         }
         // If override url has port, means it is a provider address. We want to control a specific provider with this override url, it may take effect on the specific provider instance or on consumers holding this provider instance.
@@ -60,7 +59,8 @@ public abstract class AbstractConfigurator implements Configurator {
             if (url.getPort() == configuratorUrl.getPort()) {
                 return configureIfMatch(url.getHost(), url);
             }
-        } else {// override url don't have a port, means the ip override url specify is a consumer address or 0.0.0.0
+        } else {
+            // override url don't have a port, means the ip override url specify is a consumer address or 0.0.0.0
             // 1.If it is a consumer ip address, the intention is to control a specific consumer instance, it must takes effect at the consumer side, any provider received this override url should ignore;
             // 2.If the ip is 0.0.0.0, this override url can be used on consumer, and also can be used on provider
             if (url.getParameter(Constants.SIDE_KEY, Constants.PROVIDER).equals(Constants.CONSUMER)) {
@@ -74,8 +74,7 @@ public abstract class AbstractConfigurator implements Configurator {
 
     private URL configureIfMatch(String host, URL url) {
         if (Constants.ANYHOST_VALUE.equals(configuratorUrl.getHost()) || host.equals(configuratorUrl.getHost())) {
-            String configApplication = configuratorUrl.getParameter(Constants.APPLICATION_KEY,
-                    configuratorUrl.getUsername());
+            String configApplication = configuratorUrl.getParameter(Constants.APPLICATION_KEY, configuratorUrl.getUsername());
             String currentApplication = url.getParameter(Constants.APPLICATION_KEY, url.getUsername());
             if (configApplication == null || Constants.ANY_VALUE.equals(configApplication)
                     || configApplication.equals(currentApplication)) {

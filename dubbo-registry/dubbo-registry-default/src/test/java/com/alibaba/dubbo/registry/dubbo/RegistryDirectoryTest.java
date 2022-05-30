@@ -144,7 +144,7 @@ public class RegistryDirectoryTest {
     @Test
     public void testNotified_WithError() {
         RegistryDirectory registryDirectory = getRegistryDirectory();
-        List<URL> serviceUrls = new ArrayList<URL>();
+        List<URL> serviceUrls = new ArrayList<>();
         // ignore error log
         URL badurl = URL.valueOf("notsupported://127.0.0.1/" + service);
         serviceUrls.add(badurl);

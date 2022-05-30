@@ -32,7 +32,45 @@ public class JavassistProxyFactory extends AbstractProxyFactory {
     @Override
     @SuppressWarnings("unchecked")
     public <T> T getProxy(Invoker<T> invoker, Class<?>[] interfaces) {
+        // 生成 Proxy 子类（Proxy 是抽象类）。并调用 Proxy 子类的 newInstance 方法创建 Proxy 实例
+        // InvokerInvocationHandler 实现 JDK 的 InvocationHandler 接口，具体的用途是拦截接口类调用
         return (T) Proxy.getProxy(interfaces).newInstance(new InvokerInvocationHandler(invoker));
+         /*
+            接口代理类生成代码形如：
+            public class proxy0 implements org.apache.dubbo.demo.DemoService {
+
+                public static java.lang.reflect.Method[] methods;
+
+                private java.lang.reflect.InvocationHandler handler;
+
+                public proxy0() {
+                }
+
+                public proxy0(java.lang.reflect.InvocationHandler arg0) {
+                    handler = $1;
+                }
+
+                public java.lang.String sayHello(java.lang.String arg0) {
+                    Object[] args = new Object[1];
+                    args[0] = ($w) $1;
+                    Object ret = handler.invoke(this, methods[0], args);
+                    return (java.lang.String) ret;
+                }
+            }
+            Proxy 子类生成代码形如：
+            public class Proxy1 extends com.alibaba.dubbo.common.bytecode.Proxy {
+
+                public Proxy1() {
+                }
+
+                 public Object newInstance(java.lang.reflect.InvocationHandler h) {
+                    return new org.apache.dubbo.proxy0($1);
+                }
+            }
+
+            最终，invoker放入InvokerInvocationHandler -> 通过Proxy1#newInstance放入接口代理类proxy0 -> 调用proxy0方法时调用InvokerInvocationHandler#invoker -> 实际调用了invoker#invoke
+            实现的效果为，调用RPC接口时，看似调用了本地接口DemoService，实则是DemoService的代理类proxy0，proxy0内部则调用了invoker#invoke，实现了对调用方隐藏invoker逻辑
+       */
     }
 
     @Override

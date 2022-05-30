@@ -53,6 +53,7 @@ public abstract class AbstractProxyFactory implements ProxyFactory {
             interfaces = new Class<?>[]{invoker.getInterface(), EchoService.class};
         }
 
+        // 为 http 和 hessian 协议提供泛化调用支持，参考 pull request #1827
         if (!invoker.getInterface().equals(GenericService.class) && generic) {
             int len = interfaces.length;
             Class<?>[] temp = interfaces;
