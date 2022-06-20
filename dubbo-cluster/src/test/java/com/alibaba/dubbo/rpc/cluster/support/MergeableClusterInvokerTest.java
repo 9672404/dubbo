@@ -105,13 +105,13 @@ public class MergeableClusterInvokerTest {
         given(invocation.getMethodName()).willReturn("getMenu");
         given(invocation.getParameterTypes()).willReturn(new Class<?>[]{});
         given(invocation.getArguments()).willReturn(new Object[]{});
-        given(invocation.getAttachments()).willReturn(new HashMap<String, String>())
+        given(invocation.getAttachments()).willReturn(new HashMap<>())
                 ;
         given(invocation.getInvoker()).willReturn(firstInvoker);
 
         firstInvoker = (Invoker) Proxy.newProxyInstance(getClass().getClassLoader(), new Class<?>[]{Invoker.class}, new InvocationHandler() {
 
-            public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
+            public Object invoke(Object proxy, Method method, Object[] args) {
                 if ("getUrl".equals(method.getName())) {
                     return url.addParameter(Constants.GROUP_KEY, "first");
                 }

@@ -48,7 +48,9 @@ public class ConditionRouter extends AbstractRouter {
     private static final int DEFAULT_PRIORITY = 2;
     private static Pattern ROUTE_PATTERN = Pattern.compile("([&!=,]*)\\s*([^&!=,\\s]+)");
     private final boolean force;
+    // 服务消费者
     private final Map<String, MatchPair> whenCondition;
+    // 服务提供者
     private final Map<String, MatchPair> thenCondition;
 
     public ConditionRouter(URL url) {
@@ -56,15 +58,20 @@ public class ConditionRouter extends AbstractRouter {
         this.priority = url.getParameter(Constants.PRIORITY_KEY, DEFAULT_PRIORITY);
         this.force = url.getParameter(Constants.FORCE_KEY, false);
         try {
+            // 获取路由规则
             String rule = url.getParameterAndDecoded(Constants.RULE_KEY);
             if (rule == null || rule.trim().length() == 0) {
                 throw new IllegalArgumentException("Illegal route rule!");
             }
             rule = rule.replace("consumer.", "").replace("provider.", "");
+            // 定位 => 分隔符
             int i = rule.indexOf("=>");
+            // 分别获取服务消费者和提供者匹配规则
             String whenRule = i < 0 ? null : rule.substring(0, i).trim();
             String thenRule = i < 0 ? rule.trim() : rule.substring(i + 2).trim();
-            Map<String, MatchPair> when = StringUtils.isBlank(whenRule) || "true".equals(whenRule) ? new HashMap<String, MatchPair>() : parseRule(whenRule);
+            // 解析服务消费者匹配规则
+            Map<String, MatchPair> when = StringUtils.isBlank(whenRule) || "true".equals(whenRule) ? new HashMap<>() : parseRule(whenRule);
+            // 解析服务提供者匹配规则
             Map<String, MatchPair> then = StringUtils.isBlank(thenRule) || "false".equals(thenRule) ? null : parseRule(thenRule);
             // NOTE: It should be determined on the business level whether the `When condition` can be empty or not.
             this.whenCondition = when;
@@ -74,6 +81,18 @@ public class ConditionRouter extends AbstractRouter {
         }
     }
 
+    /*
+      {
+          "host": {
+              "matches": ["2.2.2.2"],
+              "mismatches": ["1.1.1.1"]
+          },
+          "method": {
+              "matches": ["hello"],
+              "mismatches": []
+          }
+      }
+    */
     private static Map<String, MatchPair> parseRule(String rule)
             throws ParseException {
         Map<String, MatchPair> condition = new HashMap<String, MatchPair>();
@@ -84,11 +103,26 @@ public class ConditionRouter extends AbstractRouter {
         MatchPair pair = null;
         // Multiple values
         Set<String> values = null;
+        // 通过正则表达式匹配路由规则，ROUTE_PATTERN = ([&!=,]*)\s*([^&!=,\s]+)
+        // 这个表达式看起来不是很好理解，第一个括号内的表达式用于匹配"&", "!", "=" 和 "," 等符号。
+        // 第二括号内的用于匹配英文字母，数字等字符。举个例子说明一下：
+        //    host = 2.2.2.2 & host != 1.1.1.1 & method = hello
+        // 匹配结果如下：
+        //     括号一      括号二
+        // 1.  null       host
+        // 2.   =         2.2.2.2
+        // 3.   &         host
+        // 4.   !=        1.1.1.1
+        // 5.   &         method
+        // 6.   =         hello
         final Matcher matcher = ROUTE_PATTERN.matcher(rule);
         while (matcher.find()) { // Try to match one by one
+            // 获取括号一内的匹配结果
             String separator = matcher.group(1);
+            // 获取括号二内的匹配结果
             String content = matcher.group(2);
             // Start part of the condition expression.
+            // 分隔符为空，表示匹配的是表达式的开始部分
             if (separator == null || separator.length() == 0) {
                 pair = new MatchPair();
                 condition.put(content, pair);
@@ -148,14 +182,22 @@ public class ConditionRouter extends AbstractRouter {
             return invokers;
         }
         try {
+            // 先对服务消费者条件进行匹配，如果匹配失败，表明服务消费者 url 不符合匹配规则，
+            // 无需进行后续匹配，直接返回 Invoker 列表即可。比如下面的规则：
+            //     host = 10.20.153.10 => host = 10.0.0.10
+            // 这条路由规则希望 IP 为 10.20.153.10 的服务消费者调用 IP 为 10.0.0.10 机器上的服务。
+            // 当消费者 ip 为 10.20.153.11 时，matchWhen 返回 false，表明当前这条路由规则不适用于
+            // 当前的服务消费者，此时无需再进行后续匹配，直接返回即可。
             if (!matchWhen(url, invocation)) {
                 return invokers;
             }
-            List<Invoker<T>> result = new ArrayList<Invoker<T>>();
+            List<Invoker<T>> result = new ArrayList<>();
+            // 服务提供者匹配条件未配置，表明对指定的服务消费者禁用服务，也就是服务消费者在黑名单中
             if (thenCondition == null) {
                 logger.warn("The current consumer in the service blacklist. consumer: " + NetUtils.getLocalHost() + ", service: " + url.getServiceKey());
                 return result;
             }
+            // 这里可以简单的把 Invoker 理解为服务提供者，现在使用服务提供者匹配规则对Invoker列表进行匹配
             for (Invoker<T> invoker : invokers) {
                 if (matchThen(invoker.getUrl(), url)) {
                     result.add(invoker);
@@ -195,16 +237,31 @@ public class ConditionRouter extends AbstractRouter {
         return !(thenCondition == null || thenCondition.isEmpty()) && matchCondition(thenCondition, url, param, null);
     }
 
+    /*
+     {
+          "host": {
+              "matches": ["2.2.2.2"],
+              "mismatches": ["1.1.1.1"]
+          },
+          "method": {
+              "matches": ["hello"],
+              "mismatches": []
+          }
+      }
+     */
     private boolean matchCondition(Map<String, MatchPair> condition, URL url, URL param, Invocation invocation) {
         Map<String, String> sample = url.toMap();
         boolean result = false;
         for (Map.Entry<String, MatchPair> matchPair : condition.entrySet()) {
+            // 获取匹配项名称，比如 host、method 等
             String key = matchPair.getKey();
             String sampleValue;
             //get real invoked method name from invocation
             if (invocation != null && (Constants.METHOD_KEY.equals(key) || Constants.METHODS_KEY.equals(key))) {
+                // 根据被调用方法名匹配
                 sampleValue = invocation.getMethodName();
             } else {
+                // 从服务提供者或消费者 url 中获取指定字段值，比如 host、application 等
                 sampleValue = sample.get(key);
                 if (sampleValue == null) {
                     sampleValue = sample.get(Constants.DEFAULT_KEY_PREFIX + key);
@@ -212,11 +269,17 @@ public class ConditionRouter extends AbstractRouter {
             }
             if (sampleValue != null) {
                 if (!matchPair.getValue().isMatch(sampleValue, param)) {
+                    // 只要有一个规则匹配失败，立即返回 false 结束方法逻辑
                     return false;
                 } else {
                     result = true;
                 }
             } else {
+                // sampleValue 为空，表明服务提供者或消费者 url 中不包含相关字段。此时如果
+                // MatchPair 的 matches 不为空，表示匹配失败，返回 false。比如我们有这样
+                // 一条匹配条件 loadBalance = random，假设 url 中并不包含 loadBalance 参数，
+                // 此时 sampleValue = null。既然路由规则里限制了 loadBalance 必须为 random，
+                // 但 sampleValue = null，明显不符合规则，因此返回 false
                 //not pass the condition
                 if (!matchPair.getValue().matches.isEmpty()) {
                     return false;
@@ -251,7 +314,7 @@ public class ConditionRouter extends AbstractRouter {
                 return true;
             }
 
-            if (!matches.isEmpty() && !mismatches.isEmpty()) {
+            if (!matches.isEmpty()) {
                 //when both mismatches and matches contain the same value, then using mismatches first
                 for (String mismatch : mismatches) {
                     if (UrlUtils.isMatchGlobPattern(mismatch, value, param)) {

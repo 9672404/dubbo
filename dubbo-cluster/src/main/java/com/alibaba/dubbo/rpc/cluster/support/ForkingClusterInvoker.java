@@ -65,7 +65,7 @@ public class ForkingClusterInvoker<T> extends AbstractClusterInvoker<T> {
             if (forks <= 0 || forks >= invokers.size()) {
                 selected = invokers;
             } else {
-                selected = new ArrayList<Invoker<T>>();
+                selected = new ArrayList<>();
                 for (int i = 0; i < forks; i++) {
                     // TODO. Add some comment here, refer chinese version for more details.
                     Invoker<T> invoker = select(loadbalance, invocation, invokers, selected);
@@ -76,19 +76,17 @@ public class ForkingClusterInvoker<T> extends AbstractClusterInvoker<T> {
             }
             RpcContext.getContext().setInvokers((List) selected);
             final AtomicInteger count = new AtomicInteger();
-            final BlockingQueue<Object> ref = new LinkedBlockingQueue<Object>();
+            final BlockingQueue<Object> ref = new LinkedBlockingQueue<>();
             for (final Invoker<T> invoker : selected) {
-                executor.execute(new Runnable() {
-                    @Override
-                    public void run() {
-                        try {
-                            Result result = invoker.invoke(invocation);
-                            ref.offer(result);
-                        } catch (Throwable e) {
-                            int value = count.incrementAndGet();
-                            if (value >= selected.size()) {
-                                ref.offer(e);
-                            }
+                executor.execute(() -> {
+                    try {
+                        Result result = invoker.invoke(invocation);
+                        ref.offer(result);
+                    } catch (Throwable e) {
+                        int value = count.incrementAndGet();
+                        // 当调用失败的次数达到了fork的数量时，才抛出异常，否则说明可能还有成功的调用
+                        if (value >= selected.size()) {
+                            ref.offer(e);
                         }
                     }
                 });

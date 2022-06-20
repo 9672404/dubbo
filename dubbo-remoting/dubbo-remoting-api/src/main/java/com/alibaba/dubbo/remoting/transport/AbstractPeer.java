@@ -50,6 +50,7 @@ public abstract class AbstractPeer implements Endpoint, ChannelHandler {
 
     @Override
     public void send(Object message) throws RemotingException {
+        // netty未实现该方法
         send(message, url.getParameter(Constants.SENT_KEY, false));
     }
 

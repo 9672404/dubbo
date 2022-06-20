@@ -23,7 +23,7 @@ import com.alibaba.dubbo.rpc.cluster.Directory;
 
 /**
  * mock impl
- *
+ * 此处是包装类，所以在服务引用，通过Cluster.join时，就会把invoker转换为MockClusterInvoker
  */
 public class MockClusterWrapper implements Cluster {
 

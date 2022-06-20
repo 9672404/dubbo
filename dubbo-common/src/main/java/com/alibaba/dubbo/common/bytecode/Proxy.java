@@ -107,11 +107,7 @@ public abstract class Proxy {
         // get cache by class loader.
         Map<String, Object> cache;
         synchronized (ProxyCacheMap) {
-            cache = ProxyCacheMap.get(cl);
-            if (cache == null) {
-                cache = new HashMap<String, Object>();
-                ProxyCacheMap.put(cl, cache);
-            }
+            cache = ProxyCacheMap.computeIfAbsent(cl, k -> new HashMap<>());
         }
 
         Proxy proxy = null;
@@ -150,9 +146,9 @@ public abstract class Proxy {
             Set<String> worked = new HashSet<String>();
             List<Method> methods = new ArrayList<Method>();
 
-            for (int i = 0; i < ics.length; i++) {
-                if (!Modifier.isPublic(ics[i].getModifiers())) {
-                    String npkg = ics[i].getPackage().getName();
+            for (Class<?> ic : ics) {
+                if (!Modifier.isPublic(ic.getModifiers())) {
+                    String npkg = ic.getPackage().getName();
                     if (pkg == null) {
                         pkg = npkg;
                     } else {
@@ -160,10 +156,10 @@ public abstract class Proxy {
                             throw new IllegalArgumentException("non-public interfaces from different packages");
                     }
                 }
-                ccp.addInterface(ics[i]);
+                ccp.addInterface(ic);
 
                 // 遍历接口方法
-                for (Method method : ics[i].getMethods()) {
+                for (Method method : ic.getMethods()) {
                     // 获取方法描述，可理解为方法签名
                     String desc = ReflectUtils.getDesc(method);
                     // 如果方法描述字符串已在 worked 中，则忽略。考虑这种情况，A 接口和 B 接口中包含一个完全相同的方法

@@ -75,8 +75,9 @@ public class HeaderExchangeHandler implements ChannelHandlerDelegate {
         }
     }
 
-    Response handleRequest(ExchangeChannel channel, Request req) throws RemotingException {
+    Response handleRequest(ExchangeChannel channel, Request req) {
         Response res = new Response(req.getId(), req.getVersion());
+        // 检测请求是否合法，不合法则返回状态码为 BAD_REQUEST 的响应
         if (req.isBroken()) {
             Object data = req.getData();
 
@@ -90,9 +91,11 @@ public class HeaderExchangeHandler implements ChannelHandlerDelegate {
             return res;
         }
         // find handler by message class.
+        // 获取 data 字段值，也就是 RpcInvocation 对象
         Object msg = req.getData();
         try {
             // handle data.
+            // 此处的handler是服务暴露时，Exchangers.bind(url, handler)传入，handle为DubboProtocol定义的匿名类对象
             Object result = handler.reply(channel, msg);
             res.setStatus(Response.OK);
             res.setResult(result);
@@ -163,20 +166,28 @@ public class HeaderExchangeHandler implements ChannelHandlerDelegate {
         channel.setAttribute(KEY_READ_TIMESTAMP, System.currentTimeMillis());
         ExchangeChannel exchangeChannel = HeaderExchangeChannel.getOrAddChannel(channel);
         try {
+            // 处理请求对象
             if (message instanceof Request) {
                 // handle request.
                 Request request = (Request) message;
                 if (request.isEvent()) {
+                    // 处理事件
                     handlerEvent(channel, request);
+                    // 处理普通的请求
                 } else {
+                    // 双向通信
                     if (request.isTwoWay()) {
+                        // 向后调用服务，并得到调用结果
                         Response response = handleRequest(exchangeChannel, request);
+                        // 将调用结果返回给服务消费端
                         channel.send(response);
                     } else {
+                        // 如果是单向通信，仅向后调用指定服务即可，无需返回调用结果
                         handler.received(exchangeChannel, request.getData());
                     }
                 }
             } else if (message instanceof Response) {
+                // 处理响应对象，服务消费方会执行此处逻辑
                 handleResponse(channel, (Response) message);
             } else if (message instanceof String) {
                 if (isClientSide(channel)) {

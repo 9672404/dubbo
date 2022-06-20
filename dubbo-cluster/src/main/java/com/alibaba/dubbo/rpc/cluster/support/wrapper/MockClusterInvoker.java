@@ -32,6 +32,10 @@ import com.alibaba.dubbo.rpc.support.MockInvoker;
 
 import java.util.List;
 
+/**
+ * 服务调用过程中，从代理类发出请求，这里是第一个invoker，是在服务引用时通过MockClusterWrapper包装的
+ * @param <T>
+ */
 public class MockClusterInvoker<T> implements Invoker<T> {
 
     private static final Logger logger = LoggerFactory.getLogger(MockClusterInvoker.class);
@@ -67,13 +71,15 @@ public class MockClusterInvoker<T> implements Invoker<T> {
 
     @Override
     public Result invoke(Invocation invocation) throws RpcException {
-        Result result = null;
+        Result result;
 
         String value = directory.getUrl().getMethodParameter(invocation.getMethodName(), Constants.MOCK_KEY, Boolean.FALSE.toString()).trim();
         if (value.length() == 0 || value.equalsIgnoreCase("false")) {
             //no mock
+            // 这里的invoker是被负载均衡包装过的invoker，所以调用时，先到AbstractClusterInvoker，然后到具体负载均衡invoker中
             result = this.invoker.invoke(invocation);
         } else if (value.startsWith("force")) {
+            // 开启mock，直接调用mock方法
             if (logger.isWarnEnabled()) {
                 logger.info("force-mock: " + invocation.getMethodName() + " force-mock enabled , url : " + directory.getUrl());
             }
@@ -81,6 +87,7 @@ public class MockClusterInvoker<T> implements Invoker<T> {
             result = doMockInvoke(invocation, null);
         } else {
             //fail-mock
+            // 调用失败则调用mock方法
             try {
                 result = this.invoker.invoke(invocation);
             } catch (RpcException e) {

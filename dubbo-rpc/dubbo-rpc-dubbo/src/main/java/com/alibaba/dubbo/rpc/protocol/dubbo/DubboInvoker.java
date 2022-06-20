@@ -65,7 +65,7 @@ public class DubboInvoker<T> extends AbstractInvoker<T> {
     }
 
     @Override
-    protected Result doInvoke(final Invocation invocation) throws Throwable {
+    protected Result doInvoke(final Invocation invocation) {
         RpcInvocation inv = (RpcInvocation) invocation;
         final String methodName = RpcUtils.getMethodName(invocation);
         inv.setAttachment(Constants.PATH_KEY, getUrl().getPath());
@@ -75,10 +75,13 @@ public class DubboInvoker<T> extends AbstractInvoker<T> {
         if (clients.length == 1) {
             currentClient = clients[0];
         } else {
+            // 按顺序从初始化好的client中获取，client数量通过connections配置
             currentClient = clients[index.getAndIncrement() % clients.length];
         }
         try {
+            // 是否异步
             boolean isAsync = RpcUtils.isAsync(getUrl(), invocation);
+            // 是否单向请求，即不管请求结果，双向请求即便异步也处理请求结果
             boolean isOneway = RpcUtils.isOneway(getUrl(), invocation);
             int timeout = getUrl().getMethodParameter(methodName, Constants.TIMEOUT_KEY, Constants.DEFAULT_TIMEOUT);
             if (isOneway) {
@@ -87,10 +90,14 @@ public class DubboInvoker<T> extends AbstractInvoker<T> {
                 RpcContext.getContext().setFuture(null);
                 return new RpcResult();
             } else if (isAsync) {
+                // 异步请求，得到future存入上下文
+                // 这里的异步只将等待线程返回，业务方自行在任意时刻调用RpcContext.getContext().getFuture().get()来获取结果
                 ResponseFuture future = currentClient.request(inv, timeout);
-                RpcContext.getContext().setFuture(new FutureAdapter<Object>(future));
+                RpcContext.getContext().setFuture(new FutureAdapter<>(future));
                 return new RpcResult();
             } else {
+                // 同步请求，阻塞等待响应结果
+                // 底层的NIO为异步调用，此处用户线程阻塞等待，响应返回后唤醒用户线程，实现异步转同步的效果
                 RpcContext.getContext().setFuture(null);
                 return (Result) currentClient.request(inv, timeout).get();
             }

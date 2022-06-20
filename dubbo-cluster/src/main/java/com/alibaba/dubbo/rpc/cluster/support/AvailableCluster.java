@@ -28,7 +28,7 @@ import java.util.List;
 
 /**
  * AvailableCluster
- *
+ * 查询到一个可用服务然后调用
  */
 public class AvailableCluster implements Cluster {
 

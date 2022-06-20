@@ -38,7 +38,7 @@ public class ProviderConsumerRegTable {
         String serviceUniqueName = providerUrl.getServiceKey();
         Set<ProviderInvokerWrapper> invokers = providerInvokers.get(serviceUniqueName);
         if (invokers == null) {
-            providerInvokers.putIfAbsent(serviceUniqueName, new ConcurrentHashSet<ProviderInvokerWrapper>());
+            providerInvokers.putIfAbsent(serviceUniqueName, new ConcurrentHashSet<>());
             invokers = providerInvokers.get(serviceUniqueName);
         }
         invokers.add(wrapperInvoker);

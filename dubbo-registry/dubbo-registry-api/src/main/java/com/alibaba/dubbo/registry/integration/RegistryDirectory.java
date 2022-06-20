@@ -306,7 +306,7 @@ public class RegistryDirectory<T> extends AbstractDirectory<T> implements Notify
                 // }
                 List<Invoker<T>> groupInvokers = new ArrayList<>();
                 for (List<Invoker<T>> groupList : groupMap.values()) {
-                    // TODO 通过集群类合并每个分组对应的 Invoker 列表
+                    // 如果有多个Invoker,将其存入静态服务目录，然后转化为一个invoker
                     groupInvokers.add(cluster.join(new StaticDirectory<T>(groupList)));
                 }
                 result.put(method, groupInvokers);
@@ -353,7 +353,7 @@ public class RegistryDirectory<T> extends AbstractDirectory<T> implements Notify
      * @return invokers
      */
     private Map<String, Invoker<T>> toInvokers(List<URL> urls) {
-        Map<String, Invoker<T>> newUrlInvokerMap = new HashMap<String, Invoker<T>>();
+        Map<String, Invoker<T>> newUrlInvokerMap = new HashMap<>();
         if (urls == null || urls.isEmpty()) {
             return newUrlInvokerMap;
         }
@@ -467,6 +467,7 @@ public class RegistryDirectory<T> extends AbstractDirectory<T> implements Notify
         List<Router> routers = getRouters();
         if (routers != null) {
             for (Router router : routers) {
+                // url = consumer://192.168.18.218/com.alibaba.dubbo.demo.DemoService?application=demo-consumer&category=providers,configurators,routers&check=false&dubbo=2.0.2&interface=com.alibaba.dubbo.demo.DemoService&methods=sayHello&pid=86906&qos.port=33333&side=consumer&timestamp=1654088890282
                 // If router's url not null and is not route by runtime,we filter invokers here
                 if (router.getUrl() != null && !router.getUrl().getParameter(Constants.RUNTIME_KEY, false)) {
                     invokers = router.route(invokers, getConsumerUrl(), invocation);

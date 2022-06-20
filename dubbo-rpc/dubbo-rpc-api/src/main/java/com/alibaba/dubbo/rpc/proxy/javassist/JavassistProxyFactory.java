@@ -33,20 +33,20 @@ public class JavassistProxyFactory extends AbstractProxyFactory {
     @SuppressWarnings("unchecked")
     public <T> T getProxy(Invoker<T> invoker, Class<?>[] interfaces) {
         // 生成 Proxy 子类（Proxy 是抽象类）。并调用 Proxy 子类的 newInstance 方法创建 Proxy 实例
-        // InvokerInvocationHandler 实现 JDK 的 InvocationHandler 接口，具体的用途是拦截接口类调用
+        // InvokerInvocationHandler 实现 JDK 的 InvocationHandler 接口，具体的用途是代理接口类调用
         return (T) Proxy.getProxy(interfaces).newInstance(new InvokerInvocationHandler(invoker));
          /*
             接口代理类生成代码形如：
-            public class proxy0 implements org.apache.dubbo.demo.DemoService {
+            public class proxyDemo implements org.apache.dubbo.demo.DemoService {
 
                 public static java.lang.reflect.Method[] methods;
 
                 private java.lang.reflect.InvocationHandler handler;
 
-                public proxy0() {
+                public proxyDemo() {
                 }
 
-                public proxy0(java.lang.reflect.InvocationHandler arg0) {
+                public proxyDemo(java.lang.reflect.InvocationHandler arg0) {
                     handler = $1;
                 }
 
@@ -64,12 +64,12 @@ public class JavassistProxyFactory extends AbstractProxyFactory {
                 }
 
                  public Object newInstance(java.lang.reflect.InvocationHandler h) {
-                    return new org.apache.dubbo.proxy0($1);
+                    return new org.apache.dubbo.proxyDemo($1);
                 }
             }
 
-            最终，invoker放入InvokerInvocationHandler -> 通过Proxy1#newInstance放入接口代理类proxy0 -> 调用proxy0方法时调用InvokerInvocationHandler#invoker -> 实际调用了invoker#invoke
-            实现的效果为，调用RPC接口时，看似调用了本地接口DemoService，实则是DemoService的代理类proxy0，proxy0内部则调用了invoker#invoke，实现了对调用方隐藏invoker逻辑
+            最终，invoker放入InvokerInvocationHandler -> 通过Proxy1#newInstance放入接口代理类proxyDemo -> 调用proxyDemo方法时调用InvokerInvocationHandler#invoker -> 实际调用了invoker#invoke
+            实现的效果为，调用RPC接口时，看似调用了本地接口DemoService，实则是DemoService的代理类proxyDemo，proxyDemo内部则调用了invoker#invoke，实现了对调用方隐藏invoker逻辑
        */
     }
 
@@ -87,9 +87,38 @@ public class JavassistProxyFactory extends AbstractProxyFactory {
             protected Object doInvoke(T proxy, String methodName,
                                       Class<?>[] parameterTypes,
                                       Object[] arguments) throws Throwable {
+                // 根据方法名和参数描述符，匹配方法
                 return wrapper.invokeMethod(proxy, methodName, parameterTypes, arguments);
             }
         };
+        /*
+        构造包装类，将原本的类转化为三个方法
+        伪代码如下：
+        public void setPropertyValue(Object o, String n, Object v){
+            if ("aa" == n) {
+                o.setAa(v)
+            }
+            if ("bb" == n) {
+                o.setBb(v)
+            }
+        }
+        public Object getPropertyValue(Object o, String n){
+            if ("aa" == n) {
+               return o.getAa(v)
+            }
+            if ("bb" == n) {
+                return o.getBb(v)
+            }
+        }
+        public Object invokeMethod(Object o, String n, Class[] p, Object[] v) {
+            if ("setAa" == n) {
+                 o.setAa(v)
+            }
+            if ("getBb" == n) {
+                 return o.getBb(v)
+            }
+        }
+     */
     }
 
 }

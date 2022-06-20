@@ -47,6 +47,7 @@ public abstract class AbstractDirectory<T> implements Directory<T> {
 
     private volatile boolean destroyed = false;
 
+    // consumer://192.168.18.218/com.alibaba.dubbo.demo.DemoService?application=demo-consumer&category=providers,configurators,routers&check=false&dubbo=2.0.2&interface=com.alibaba.dubbo.demo.DemoService&methods=sayHello&pid=86906&qos.port=33333&side=consumer&timestamp=1654088890282
     private volatile URL consumerUrl;
 
     private volatile List<Router> routers;
@@ -100,7 +101,7 @@ public abstract class AbstractDirectory<T> implements Directory<T> {
 
     protected void setRouters(List<Router> routers) {
         // copy list
-        routers = routers == null ? new ArrayList<Router>() : new ArrayList<Router>(routers);
+        routers = routers == null ? new ArrayList<>() : new ArrayList<Router>(routers);
         // append url router
         String routerkey = url.getParameter(Constants.ROUTER_KEY);
         if (routerkey != null && routerkey.length() > 0) {

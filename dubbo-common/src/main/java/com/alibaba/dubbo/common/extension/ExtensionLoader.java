@@ -786,7 +786,7 @@ public class ExtensionLoader<T> {
      * 简要流程为
      * 1、查找被@Adaptive修饰的方法，生成扩展代码
      * 2、从方法的入参或者入参的内部字段中查找URL对象
-     * 3、获取扩展名，优先级为@Adaptive注解值（注解值为key，从URL中获取value） -> @SPI注解值 -> 接口格式化类名（xxxYyy格式化为xxx.yyy）
+     * 3、获取扩展名，优先级为@Adaptive注解值（注解值为key，从URL中获取value） -> 接口格式化类名（xxxYyy格式化为xxx.yyy） -> @SPI注解值
      * 4、得到扩展名后，通过SPI加载扩展名对应的实例，扩展名即为SPI配置文件的配置项名
      * 5、获取到具体实例后，调用方法执行逻辑
      */
@@ -945,7 +945,7 @@ public class ExtensionLoader<T> {
                 String getNameCode = null;
                 /*
                  * 下述代码较为复杂，但目的就是为了获取扩展名，可简述为
-                 * 1、优先级为 @Adaptive注解值顺序 -> @SPI注解值 -> 接口格式化类名（xxxYyy格式化为xxx.yyy）
+                 * 1、优先级为 @Adaptive注解值顺序 -> 接口格式化类名（xxxYyy格式化为xxx.yyy）-> @SPI注解值
                  * 2、若注解值为protocol，则表示从URL的protocol字段获取，否则从URL的parameters键值对获取
                  * 3、url.getParameter(key, defaultValue)，第二个参数为兜底value
                  */

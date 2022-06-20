@@ -214,6 +214,7 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
             }
             checkInterfaceAndMethods(interfaceClass, methods);
         }
+        // 从系统变量中获取与接口名对应的属性值
         String resolve = System.getProperty(interfaceName);
         String resolveFile = null;
         if (resolve == null || resolve.length() == 0) {
@@ -286,8 +287,8 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
         // 本地存根
         checkStub(interfaceClass);
         checkMock(interfaceClass);
-        Map<String, String> map = new HashMap<String, String>();
-        Map<Object, Object> attributes = new HashMap<Object, Object>();
+        Map<String, String> map = new HashMap<>();
+        Map<Object, Object> attributes = new HashMap<>();
         map.put(Constants.SIDE_KEY, Constants.CONSUMER_SIDE);
         map.put(Constants.DUBBO_VERSION_KEY, Version.getProtocolVersion());
         map.put(Constants.TIMESTAMP_KEY, String.valueOf(System.currentTimeMillis()));
@@ -306,7 +307,7 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
                 logger.warn("NO method found in service interface " + interfaceClass.getName());
                 map.put("methods", Constants.ANY_VALUE);
             } else {
-                map.put("methods", StringUtils.join(new HashSet<String>(Arrays.asList(methods)), ","));
+                map.put("methods", StringUtils.join(new HashSet<>(Arrays.asList(methods)), ","));
             }
         }
         map.put(Constants.INTERFACE_KEY, interfaceName);
@@ -358,16 +359,14 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
         final boolean isJvmRefer;
         if (isInjvm() == null) {
             // url 配置被指定，则不做本地引用
+            // by default, reference local service if there is
             if (url != null && url.length() > 0) { // if a url is specified, don't do local reference
                 isJvmRefer = false;
-            } else if (InjvmProtocol.getInjvmProtocol().isInjvmRefer(tmpUrl)) {
-                // by default, reference local service if there is
-                isJvmRefer = true;
             } else {
-                isJvmRefer = false;
+                isJvmRefer = InjvmProtocol.getInjvmProtocol().isInjvmRefer(tmpUrl);
             }
         } else {
-            isJvmRefer = isInjvm().booleanValue();
+            isJvmRefer = isInjvm();
         }
 
         if (isJvmRefer) {

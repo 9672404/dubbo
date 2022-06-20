@@ -44,7 +44,8 @@ public class ChannelHandlers {
     }
 
     protected ChannelHandler wrapInternal(ChannelHandler handler, URL url) {
-        return new MultiMessageHandler(new HeartbeatHandler(ExtensionLoader.getExtensionLoader(Dispatcher.class)
-                .getAdaptiveExtension().dispatch(handler, url)));
+        // 此处层层包装，在接收到消息的时候，会依次调用各个ChannelHandler的decode方法，MultiMessageHandler -> HeartbeatHandler -> 线程派发Handler
+        // Server和Client都会经此包装，所以双向通信时都会经过线程派发模型
+        return new MultiMessageHandler(new HeartbeatHandler(ExtensionLoader.getExtensionLoader(Dispatcher.class).getAdaptiveExtension().dispatch(handler, url)));
     }
 }

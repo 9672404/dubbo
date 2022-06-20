@@ -46,6 +46,10 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
+/**
+ * 调用多个分组下的相同方法，合并结果
+ * @param <T>
+ */
 @SuppressWarnings("unchecked")
 public class MergeableClusterInvoker<T> implements Invoker<T> {
 
@@ -60,6 +64,18 @@ public class MergeableClusterInvoker<T> implements Invoker<T> {
     @Override
     @SuppressWarnings("rawtypes")
     public Result invoke(final Invocation invocation) throws RpcException {
+        // 这里的invoker，先根据group分组invoker，然后再将各组的多个invoker封装为静态目录，最后维护一个methodName -> 分组静态目录的映射
+        /*
+           分组和invoker映射关系
+            {
+              "dubbo": [invoker1, invoker2, invoker3, ...],
+              "hello": [invoker4, invoker5, invoker6, ...]
+            }
+            方法名和封装后的分组invoker映射
+            {
+                "sayHelloMethod":[dubboInvoker, helloInvoker, ...],
+            }
+         */
         List<Invoker<T>> invokers = directory.list(invocation);
 
         String merger = getUrl().getMethodParameter(invocation.getMethodName(), Constants.MERGER_KEY);
@@ -74,26 +90,21 @@ public class MergeableClusterInvoker<T> implements Invoker<T> {
 
         Class<?> returnType;
         try {
-            returnType = getInterface().getMethod(
-                    invocation.getMethodName(), invocation.getParameterTypes()).getReturnType();
+            returnType = getInterface().getMethod(invocation.getMethodName(), invocation.getParameterTypes()).getReturnType();
         } catch (NoSuchMethodException e) {
             returnType = null;
         }
 
-        Map<String, Future<Result>> results = new HashMap<String, Future<Result>>();
+        Map<String, Future<Result>> results = new HashMap<>();
+        // 广播调用invoker,并等待所有invoker返回结果
         for (final Invoker<T> invoker : invokers) {
-            Future<Result> future = executor.submit(new Callable<Result>() {
-                @Override
-                public Result call() throws Exception {
-                    return invoker.invoke(new RpcInvocation(invocation, invoker));
-                }
-            });
+            Future<Result> future = executor.submit(() -> invoker.invoke(new RpcInvocation(invocation, invoker)));
             results.put(invoker.getUrl().getServiceKey(), future);
         }
 
-        Object result = null;
+        Object result;
 
-        List<Result> resultList = new ArrayList<Result>(results.size());
+        List<Result> resultList = new ArrayList<>(results.size());
 
         int timeout = getUrl().getMethodParameter(invocation.getMethodName(), Constants.TIMEOUT_KEY, Constants.DEFAULT_TIMEOUT);
         for (Map.Entry<String, Future<Result>> entry : results.entrySet()) {
@@ -122,6 +133,7 @@ public class MergeableClusterInvoker<T> implements Invoker<T> {
             return new RpcResult((Object) null);
         }
 
+        // 指定了自定义的合并结果方法，该方法定义在返回值对象中，通过反射调用
         if (merger.startsWith(".")) {
             merger = merger.substring(1);
             Method method;
@@ -150,6 +162,7 @@ public class MergeableClusterInvoker<T> implements Invoker<T> {
                 throw new RpcException("Can not merge result: " + e.getMessage(), e);
             }
         } else {
+            // 根据返回值类型，选择合并扩展类，一般为基本类型或者集合类型
             Merger resultMerger;
             if (ConfigUtils.isDefault(merger)) {
                 resultMerger = MergerFactory.getMerger(returnType);

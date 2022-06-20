@@ -45,7 +45,7 @@ public class DefaultFuture implements ResponseFuture {
 
     private static final Map<Long, Channel> CHANNELS = new ConcurrentHashMap<Long, Channel>();
 
-    private static final Map<Long, DefaultFuture> FUTURES = new ConcurrentHashMap<Long, DefaultFuture>();
+    private static final Map<Long, DefaultFuture> FUTURES = new ConcurrentHashMap<>();
 
     static {
         Thread th = new Thread(new RemotingInvocationTimeoutScan(), "DubboResponseTimeoutScanTimer");
@@ -115,6 +115,7 @@ public class DefaultFuture implements ResponseFuture {
 
     public static void received(Channel channel, Response response) {
         try {
+            // 根据请求ID找到对应的等待线程
             DefaultFuture future = FUTURES.remove(response.getId());
             if (future != null) {
                 future.doReceived(response);
@@ -273,13 +274,14 @@ public class DefaultFuture implements ResponseFuture {
         sent = System.currentTimeMillis();
     }
 
+
     private void doReceived(Response res) {
         lock.lock();
         try {
+            // 将结果设置到DefaultFuture中
             response = res;
-            if (done != null) {
-                done.signal();
-            }
+            // 唤醒等待线程
+            done.signal();
         } finally {
             lock.unlock();
         }
@@ -307,6 +309,7 @@ public class DefaultFuture implements ResponseFuture {
         public void run() {
             while (true) {
                 try {
+                    // 扫描等待线程中过期的，直接返回已过期状态
                     for (DefaultFuture future : FUTURES.values()) {
                         if (future == null || future.isDone()) {
                             continue;

@@ -58,7 +58,7 @@ public class FailbackClusterInvoker<T> extends AbstractClusterInvoker<T> {
     private final ScheduledExecutorService scheduledExecutorService = Executors.newScheduledThreadPool(2,
             new NamedInternalThreadFactory("failback-cluster-timer", true));
 
-    private final ConcurrentMap<Invocation, AbstractClusterInvoker<?>> failed = new ConcurrentHashMap<Invocation, AbstractClusterInvoker<?>>();
+    private final ConcurrentMap<Invocation, AbstractClusterInvoker<?>> failed = new ConcurrentHashMap<>();
     private volatile ScheduledFuture<?> retryFuture;
 
     public FailbackClusterInvoker(Directory<T> directory) {
@@ -69,16 +69,12 @@ public class FailbackClusterInvoker<T> extends AbstractClusterInvoker<T> {
         if (retryFuture == null) {
             synchronized (this) {
                 if (retryFuture == null) {
-                    retryFuture = scheduledExecutorService.scheduleWithFixedDelay(new Runnable() {
-
-                        @Override
-                        public void run() {
-                            // collect retry statistics
-                            try {
-                                retryFailed();
-                            } catch (Throwable t) { // Defensive fault tolerance
-                                logger.error("Unexpected error occur at collect statistic", t);
-                            }
+                    retryFuture = scheduledExecutorService.scheduleWithFixedDelay(() -> {
+                        // collect retry statistics
+                        try {
+                            retryFailed();
+                        } catch (Throwable t) { // Defensive fault tolerance
+                            logger.error("Unexpected error occur at collect statistic", t);
                         }
                     }, RETRY_FAILED_PERIOD, RETRY_FAILED_PERIOD, TimeUnit.MILLISECONDS);
                 }
@@ -91,8 +87,7 @@ public class FailbackClusterInvoker<T> extends AbstractClusterInvoker<T> {
         if (failed.size() == 0) {
             return;
         }
-        for (Map.Entry<Invocation, AbstractClusterInvoker<?>> entry : new HashMap<Invocation, AbstractClusterInvoker<?>>(
-                failed).entrySet()) {
+        for (Map.Entry<Invocation, AbstractClusterInvoker<?>> entry : new HashMap<>(failed).entrySet()) {
             Invocation invocation = entry.getKey();
             Invoker<?> invoker = entry.getValue();
             try {
@@ -113,6 +108,7 @@ public class FailbackClusterInvoker<T> extends AbstractClusterInvoker<T> {
         } catch (Throwable e) {
             logger.error("Failback to invoke method " + invocation.getMethodName() + ", wait for retry in background. Ignored exception: "
                     + e.getMessage() + ", ", e);
+            // 失败则加入定时任务重试
             addFailed(invocation, this);
             return new RpcResult(); // ignore
         }

@@ -69,6 +69,7 @@ public class FutureFilter implements Filter {
     }
 
     private void asyncCallback(final Invoker<?> invoker, final Invocation invocation) {
+        // 双向通信异步请求，等待结果返回唤醒线程
         Future<?> f = RpcContext.getContext().getFuture();
         if (f instanceof FutureAdapter) {
             ResponseFuture future = ((FutureAdapter<?>) f).getFuture();
