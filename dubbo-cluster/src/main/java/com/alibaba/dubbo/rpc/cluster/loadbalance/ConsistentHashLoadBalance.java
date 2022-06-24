@@ -94,7 +94,6 @@ public class ConsistentHashLoadBalance extends AbstractLoadBalance {
                         long m = hash(digest, h);
                         // 将 hash 到 invoker 的映射关系存储到 virtualInvokers 中，
                         // virtualInvokers 需要提供高效的查询操作，因此选用 TreeMap 作为存储结构
-                        // 四个hash对应一个invoker
                         virtualInvokers.put(m, invoker);
                     }
                 }
